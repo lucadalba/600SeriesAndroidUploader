@@ -835,4 +835,9 @@
     <string name="system_status__uploader_battery_charge_soon">Carica presto il tuo dispositivo di carico</string>
     <string name="system_status__uploader_battery_fully_charged">Batteria trasmettitore carica completamente</string>
     <string name="system_status__estimate_active">Stima SGV attiva</string>
+
+    <!-- new strings -->
+    <string name="show_log">Mostra log</string>
+    <string name="hide_log">Nascondi log</string>
+
 </resources>

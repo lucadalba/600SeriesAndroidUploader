@@ -34,10 +34,12 @@ import info.nightscout.android.model.store.StatNightscout;
 import info.nightscout.android.model.store.StatPushover;
 import info.nightscout.android.model.store.UserLog;
 import info.nightscout.android.utils.FormatKit;
+import io.github.inflationx.calligraphy3.CalligraphyInterceptor;
+import io.github.inflationx.viewpump.ViewPump;
 import io.realm.Realm;
 import io.realm.RealmConfiguration;
 import io.realm.annotations.RealmModule;
-import uk.co.chrisjenx.calligraphy.CalligraphyConfig;
+import io.github.inflationx.calligraphy3.CalligraphyConfig;
 import androidx.multidex.MultiDexApplication;
 
 /**
@@ -62,10 +64,16 @@ public class UploaderApplication extends MultiDexApplication {
 
         startupRealtime = SystemClock.elapsedRealtime();
 
-        CalligraphyConfig.initDefault(new CalligraphyConfig.Builder()
-                .setDefaultFontPath("fonts/OpenSans-Regular.ttf")
-                .setFontAttrId(R.attr.fontPath)
-                .build()
+        ViewPump.init(ViewPump.builder()
+                .addInterceptor(
+                        new CalligraphyInterceptor(
+                                new CalligraphyConfig.Builder()
+                                        .setDefaultFontPath("fonts/OpenSans-Regular.ttf")
+                                        .setFontAttrId(R.attr.fontPath)
+                                        .build()
+                        )
+                ).build()
+
         );
 
         if (!BuildConfig.DEBUG) {

@@ -966,4 +966,8 @@
     <string name="system_status__uploader_battery_fully_charged">Uploader battery fully charged</string>
     <string name="system_status__estimate_active">SGV Estimate is active</string>
 
+    <!-- new strings -->
+    <string name="show_log">Show log</string>
+    <string name="hide_log">Hide log</string>
+
 </resources>

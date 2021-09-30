@@ -22,6 +22,7 @@ import androidx.annotation.NonNull;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.menu.MenuView;
+import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.appcompat.widget.Toolbar;
 import android.text.Layout;
@@ -42,6 +43,7 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -83,7 +85,7 @@ import io.realm.OrderedRealmCollectionChangeListener;
 import io.realm.Realm;
 import io.realm.RealmResults;
 import io.realm.Sort;
-import uk.co.chrisjenx.calligraphy.CalligraphyContextWrapper;
+import io.github.inflationx.viewpump.ViewPumpContextWrapper;
 
 public class MainActivity extends AppCompatActivity implements OnSharedPreferenceChangeListener, OnEulaAgreedTo {
     private static final String TAG = MainActivity.class.getSimpleName();
@@ -456,6 +458,27 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
         setScreenSleepMode();
 
         userLogDisplay = new UserLogDisplay(mContext);
+
+        // allow user to change log visibility by tapping on its specific button
+        Button showLogBtn = findViewById(R.id.showLogBtn);
+        CoordinatorLayout log = findViewById(R.id.log_section);
+        showLogBtn.setOnClickListener(
+                new View.OnClickListener()
+                {
+                    public void onClick(View view)
+                    {
+                        if(log.getVisibility()==View.GONE) {
+                            log.setVisibility(View.VISIBLE);
+                            showLogBtn.setText(R.string.hide_log);
+                        }
+                        else {
+                            log.setVisibility(View.GONE);
+                            showLogBtn.setText(R.string.show_log);
+                        }
+                    }
+                }
+        );
+
     }
 
     private void setScreenSleepMode() {
@@ -691,7 +714,7 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
     @Override
     protected void attachBaseContext(Context newBase) {
         Log.d(TAG, "attachBaseContext called");
-        super.attachBaseContext(CalligraphyContextWrapper.wrap(newBase));
+        super.attachBaseContext(ViewPumpContextWrapper.wrap(newBase));
     }
 
     @Override

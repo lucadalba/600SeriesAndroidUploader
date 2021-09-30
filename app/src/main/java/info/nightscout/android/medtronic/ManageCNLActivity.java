@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import info.nightscout.android.R;
 import info.nightscout.android.model.medtronicNg.ContourNextLinkInfo;
 import io.realm.Realm;
-import uk.co.chrisjenx.calligraphy.CalligraphyContextWrapper;
+import io.github.inflationx.viewpump.ViewPumpContextWrapper;
 
 /**
  * A login screen that offers login via username/password.
@@ -90,7 +90,7 @@ public class ManageCNLActivity extends AppCompatActivity {
 
     @Override
     protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(CalligraphyContextWrapper.wrap(newBase));
+        super.attachBaseContext(ViewPumpContextWrapper.wrap(newBase));
     }
 
     private class CNLAdapter extends BaseAdapter implements ListAdapter {

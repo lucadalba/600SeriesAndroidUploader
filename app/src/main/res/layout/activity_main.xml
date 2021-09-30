@@ -113,10 +113,17 @@
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <Button
+        android:id="@+id/showLogBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/show_log" />
+
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/log_section"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:visibility="gone">
 
         <androidx.coordinatorlayout.widget.CoordinatorLayout
             android:saveEnabled="false"
