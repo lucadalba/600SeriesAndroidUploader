@@ -969,5 +969,6 @@
     <!-- new strings -->
     <string name="show_log">Show log</string>
     <string name="hide_log">Hide log</string>
+    <string name="latest_data">Latest data:</string>
 
 </resources>

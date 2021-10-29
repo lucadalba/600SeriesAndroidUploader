@@ -20,9 +20,13 @@ import android.preference.PreferenceManager;
 import android.provider.Settings;
 import androidx.annotation.NonNull;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.view.menu.MenuView;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
+import androidx.lifecycle.MutableLiveData;
+import androidx.lifecycle.Observer;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.appcompat.widget.Toolbar;
 import android.text.Layout;
@@ -44,6 +48,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -73,6 +78,7 @@ import info.nightscout.android.eula.Eula;
 import info.nightscout.android.eula.Eula.OnEulaAgreedTo;
 import info.nightscout.android.history.PumpHistoryParser;
 import info.nightscout.android.medtronic.service.MasterService;
+import info.nightscout.android.medtronic.service.MedtronicCnlService;
 import info.nightscout.android.model.medtronicNg.PumpHistoryCGM;
 import info.nightscout.android.model.medtronicNg.PumpStatusEvent;
 import info.nightscout.android.settings.SettingsActivity;
@@ -91,6 +97,8 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
     private static final String TAG = MainActivity.class.getSimpleName();
 
     public static final float MMOLXLFACTOR = 18.016f;
+
+    public static MutableLiveData<Boolean> usbError;
 
     private Context mContext;
 
@@ -136,6 +144,24 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
         mContext = this.getBaseContext();
 
         RealmKit.compact(mContext);
+
+        usbError = new MutableLiveData<>();
+
+        usbError.observe(this, new Observer<Boolean>() {
+            @Override
+            public void onChanged(@Nullable final Boolean usbErrorNow) {
+                ImageView linkPhoneGlucometer = findViewById(R.id.linkPhoneGlucometer);
+                ImageView linkGlucometerMicro = findViewById(R.id.linkGlucometerMicro);
+                ImageView linkMicroSensor = findViewById(R.id.linkMicroSensor);
+                if(usbErrorNow) {
+                    linkPhoneGlucometer.setImageResource(R.drawable.notconnected);
+                    linkGlucometerMicro.setImageResource(R.drawable.link);
+                    linkMicroSensor.setImageResource(R.drawable.link);
+                }
+                else
+                    linkPhoneGlucometer.setImageResource(R.drawable.connected);
+            }
+        });
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(getBaseContext());
         PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
@@ -1086,51 +1112,89 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
 
         if (displayCgmResults.size() > 0) {
             timeLastSGV = displayCgmResults.last().getEventDate().getTime();
-            sgvString = FormatKit.getInstance().formatAsGlucose(displayCgmResults.last().getSgv(), false, true);
-            String trend = displayCgmResults.last().getCgmTrend();
-            if (displayCgmResults.last().isEstimate()) {
-                trendString = "{ion-ios-medical}";
-            } else if (trend != null) {
-                switch (PumpHistoryCGM.NS_TREND.valueOf(trend)) {
-                    case TRIPLE_UP:
-                        trendString = "{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}";
-                        break;
-                    case DOUBLE_UP:
-                        trendString = "{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}";
-                        break;
-                    case SINGLE_UP:
-                        trendString = "{ion_ios_arrow_thin_up}";
-                        break;
-                    case FOURTY_FIVE_UP:
-                        trendRotation = -45;
-                        trendString = "{ion_ios_arrow_thin_right}";
-                        break;
-                    case FLAT:
-                        trendString = "{ion_ios_arrow_thin_right}";
-                        break;
-                    case FOURTY_FIVE_DOWN:
-                        trendRotation = 45;
-                        trendString = "{ion_ios_arrow_thin_right}";
-                        break;
-                    case SINGLE_DOWN:
-                        trendString = "{ion_ios_arrow_thin_down}";
-                        break;
-                    case DOUBLE_DOWN:
-                        trendString = "{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}";
-                        break;
-                    case TRIPLE_DOWN:
-                        trendString = "{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}";
-                        break;
-                    default:
-                        trendString = "{ion_ios_minus_empty}";
-                        break;
+            ImageView linkGlucometerMicro = findViewById(R.id.linkGlucometerMicro);
+            ImageView linkMicroSensor = findViewById(R.id.linkMicroSensor);
+            SharedPreferences pref = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+            if(pref.getBoolean("microLinkError", true)) {
+                linkGlucometerMicro.setImageResource(R.drawable.notconnected);
+                linkMicroSensor.setImageResource(R.drawable.link);
+            }
+            else {
+                linkGlucometerMicro.setImageResource(R.drawable.connected);
+                if(pref.getBoolean("sensorLinkError", true))
+                    linkMicroSensor.setImageResource(R.drawable.notconnected);
+                else
+                    linkMicroSensor.setImageResource(R.drawable.connected);
+            }
+            if(System.currentTimeMillis() - timeLastSGV < 420000) {
+                sgvString = FormatKit.getInstance().formatAsGlucose(displayCgmResults.last().getSgv(), false, true);
+                String trend = displayCgmResults.last().getCgmTrend();
+                if (displayCgmResults.last().isEstimate()) {
+                    trendString = "{ion-ios-medical}";
+                }
+                else {
+                    if (trend != null) {
+                        switch (PumpHistoryCGM.NS_TREND.valueOf(trend)) {
+                            case TRIPLE_UP:
+                                trendString = "{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}";
+                                break;
+                            case DOUBLE_UP:
+                                trendString = "{ion_ios_arrow_thin_up}{ion_ios_arrow_thin_up}";
+                                break;
+                            case SINGLE_UP:
+                                trendString = "{ion_ios_arrow_thin_up}";
+                                break;
+                            case FOURTY_FIVE_UP:
+                                trendRotation = -45;
+                                trendString = "{ion_ios_arrow_thin_right}";
+                                break;
+                            case FLAT:
+                                trendString = "{ion_ios_arrow_thin_right}";
+                                break;
+                            case FOURTY_FIVE_DOWN:
+                                trendRotation = 45;
+                                trendString = "{ion_ios_arrow_thin_right}";
+                                break;
+                            case SINGLE_DOWN:
+                                trendString = "{ion_ios_arrow_thin_down}";
+                                break;
+                            case DOUBLE_DOWN:
+                                trendString = "{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}";
+                                break;
+                            case TRIPLE_DOWN:
+                                trendString = "{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}{ion_ios_arrow_thin_down}";
+                                break;
+                            default:
+                                trendString = "{ion_ios_minus_empty}";
+                                break;
+                        }
+                    }
+                }
+
+                textViewBg.setText(sgvString);
+                textViewTrend.setText(trendString);
+                textViewTrend.setRotation(trendRotation);
+
+                int sgvInt = Integer.parseInt(sgvString);
+                if(sgvInt<80) {
+                    textViewBg.setTextColor(Color.parseColor("#FFFF0000"));
+                }
+                else {
+                    if(sgvInt<190) {
+                        textViewBg.setTextColor(Color.parseColor("#FF00FF00"));
+                    }
+                    else {
+                        textViewBg.setTextColor(Color.parseColor("#FFFF8800"));
+                    }
                 }
             }
+            else {
+                textViewBg.setTextColor(Color.parseColor("#FFFFFFFF"));
+                textViewBg.setText("---");
+                textViewTrend.setText("");
+                textViewTrend.setRotation(0);
+            }
         }
-
-        textViewBg.setText(sgvString);
-        textViewTrend.setText(trendString);
-        textViewTrend.setRotation(trendRotation);
 
         mUiRefreshHandler.post(mUiRefreshRunnable);
     }
@@ -1149,7 +1213,15 @@ public class MainActivity extends AppCompatActivity implements OnSharedPreferenc
                 timeString = DateUtils.getRelativeTimeSpanString(timeLastSGV).toString();
             }
 
-            textViewBgTime.setText(timeString);
+            textViewBgTime.setText(getResources().getString(R.string.latest_data) + " " + timeString);
+
+            if(System.currentTimeMillis() - timeLastSGV >= 420000) {
+                TextView textViewBg = findViewById(R.id.textview_bg);
+                TextView textViewTrend = findViewById(R.id.textview_trend);
+                textViewBg.setText("---");
+                textViewTrend.setText("");
+                textViewTrend.setRotation(0);
+            }
 
             MenuView.ItemView batIcon = findViewById(R.id.status_battery);
             if (batIcon != null) {

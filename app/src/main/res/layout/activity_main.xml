@@ -21,6 +21,80 @@
 
     </com.google.android.material.appbar.AppBarLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="10dp">
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/phone"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="17dp"/>
+
+        <ImageView
+            android:id="@+id/linkPhoneGlucometer"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/connected"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="30dp"
+            android:layout_marginStart="5dp"
+            android:layout_marginEnd="5dp" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/usb"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="30dp"/>
+
+        <ImageView
+            android:id="@+id/linkGlucometerMicro"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/link"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="30dp"
+            android:layout_marginStart="5dp"
+            android:layout_marginEnd="5dp" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/micro"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="15dp"/>
+
+        <ImageView
+            android:id="@+id/linkMicroSensor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/link"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="30dp"
+            android:layout_marginStart="5dp"
+            android:layout_marginEnd="5dp" />
+
+        <ImageView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:src="@drawable/sensor"
+            android:scaleType="fitCenter"
+            android:adjustViewBounds="true"
+            android:maxWidth="25dp"/>
+
+    </LinearLayout>
+
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/view_sgv"
         android:layout_width="fill_parent"
@@ -46,7 +120,7 @@
             android:layout_height="wrap_content"
             android:layout_marginBottom="8dp"
             android:maxLines="1"
-            android:text="@string/dash"
+            android:text="---"
             android:textAlignment="center"
             android:textAppearance="?android:attr/textAppearanceLarge"
             android:textSize="70sp"
@@ -62,7 +136,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:maxLines="1"
-            android:text="@string/dash"
             android:textAppearance="?android:attr/textAppearanceLarge"
             android:textSize="40sp"
             app:layout_constraintBottom_toBottomOf="@+id/textview_bg"

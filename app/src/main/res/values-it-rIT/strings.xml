@@ -839,5 +839,6 @@
     <!-- new strings -->
     <string name="show_log">Mostra log</string>
     <string name="hide_log">Nascondi log</string>
+    <string name="latest_data">Ultima ricezione:</string>
 
 </resources>

@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbEndpoint;
@@ -335,6 +336,13 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
 
     private class ReadPump extends Thread {
         public void run() {
+            SharedPreferences pref = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+            SharedPreferences.Editor editor = pref.edit();
+            editor.putBoolean("sensorLinkError", false);
+            editor.apply();
+            editor.putBoolean("microLinkError", false);
+            editor.apply();
+
             Log.d(TAG, "readPump called");
 
             PowerManager.WakeLock wl = getWakeLock(mContext, TAG, 90000);
@@ -346,6 +354,7 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
             timePollStarted = System.currentTimeMillis();
             long nextpoll = 0;
 
+            //Errore USB o generico
             try {
                 // note: Realm use only in this thread!
                 realm = Realm.getDefaultInstance();
@@ -391,6 +400,7 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                 final MedtronicCnlReader cnlReader = new MedtronicCnlReader(mHidDevice);
                 if (dataStore.isSysEnableWait500ms()) cnlReader.setCnlCommandMessageSleepMS(500);
 
+                //Errori vari
                 try {
                     Log.d(TAG, "Connecting to Contour Next Link [pid" + android.os.Process.myPid() + "]");
                     UserLogMessage.send(mContext, R.string.ul_poll__connecting_to_contour_next_link);
@@ -416,6 +426,7 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
 
                     cnlReader.enterControlMode();
 
+                    //Errori vari
                     try {
                         cnlReader.enterPassthroughMode();
                         shutdownProtect = false;
@@ -470,7 +481,10 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                         }
 
                         final byte radioChannel = cnlReader.negotiateChannel(activePump.getLastRadioChannel(), singleChannel);
+                        //Errore micro lontano
                         if (radioChannel == 0) {
+                            editor.putBoolean("microLinkError", true);
+                            editor.apply();
                             Log.i(TAG, "Could not communicate with the pump. Is it nearby?");
                             UserLogMessage.send(mContext, UserLogMessage.TYPE.WARN, R.string.ul_poll__could_not_communicate_with_the_pump);
                             statPoll.incPollNoConnect();
@@ -480,7 +494,11 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                                     .lastConnect()
                                     .process();
 
-                        } else if (cnlReader.getPumpSession().getRadioRSSIpercentage() < dataStore.getSysRssiAllowConnect()) {
+                        }
+                        //Errore segnale debole
+                        else if (cnlReader.getPumpSession().getRadioRSSIpercentage() < dataStore.getSysRssiAllowConnect()) {
+                            editor.putBoolean("microLinkError", true);
+                            editor.apply();
                             Log.i(TAG, "Warning: pump signal too weak. Is it nearby?");
                             UserLogMessage.send(mContext, String.format("{id;%s} %s  {id;%s}: %s%%",
                                     R.string.ul_poll__connected_on_channel,
@@ -495,7 +513,8 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                                     .lastConnect()
                                     .process();
 
-                        } else {
+                        }
+                        else {
                             if (commsConnectError > 0) commsConnectError--;
                             if (cnlReader.getPumpSession().getRadioRSSIpercentage() < RSSI_SIGNAL_WEAK) {
                                 commsSignalError++;
@@ -589,13 +608,16 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
 
                         }
                         statPoll.decPollError();
-
-                    } catch (IntegrityException e) {
+                    }
+                    catch (IntegrityException e) {
+                        editor.putBoolean("microLinkError", true);
+                        editor.apply();
                         UserLogMessage.send(mContext, UserLogMessage.TYPE.WARN, R.string.ul_integrity__check_failed_time_mismatch);
                         pollInterval = System.currentTimeMillis() - timePollStarted + 10000L;
                         reset();
 
-                    } catch (UnexpectedMessageException e) {
+                    }
+                    catch (UnexpectedMessageException e) {
                         pollInterval = dataStore.isSysEnablePollOverride() ? dataStore.getSysPollErrorRetry() : POLL_ERROR_RETRY_MS;
                         Log.e(TAG, "Unexpected Message", e);
 
@@ -623,71 +645,89 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                                     .lastConnect()
                                     .process();
                             UserLogMessage.send(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__pump_device_error);
+                            //todo gestire finestra errore sul micro
                         } else {
                             UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__communication_busy_noisy);
                             UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__communication, e.getMessage()));
                         }
-
-                    } catch (TimeoutException e) {
+                        editor.putBoolean("microLinkError", true);
+                        editor.apply();
+                    }
+                    catch (TimeoutException e) {
+                        editor.putBoolean("microLinkError", true);
+                        editor.apply();
                         commsError++;
                         pollInterval = dataStore.isSysEnablePollOverride() ? dataStore.getSysPollErrorRetry() : POLL_ERROR_RETRY_MS;
                         Log.e(TAG, "Timeout communicating with the Contour Next Link.", e);
                         UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__timeout_pump);
                         UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__timeout, e.getMessage()));
-                    } catch (ChecksumException e) {
+                    }
+                    catch (ChecksumException e) {
                         commsError++;
                         Log.e(TAG, "Checksum error getting message from the Contour Next Link.", e);
                         UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__checksum_cnl);
                         UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__checksum, e.getMessage()));
-                    } catch (EncryptionException e) {
+                    }
+                    catch (EncryptionException e) {
                         commsError++;
                         Log.e(TAG, "Error decrypting messages from Contour Next Link.", e);
                         UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__decryption_cnl);
                         UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__decryption, e.getMessage()));
-                    } catch (NoSuchAlgorithmException e) {
+                    }
+                    catch (NoSuchAlgorithmException e) {
                         commsError++;
                         Log.e(TAG, "Could not determine CNL HMAC", e);
                         UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__hashing);
                         UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__hashing, e.getMessage()));
-                    } finally {
+                    }
+                    finally {
+                        //Bho
                         try {
                             cnlReader.closeConnection();
                             shutdownProtect = true;
                             cnlReader.endPassthroughMode();
                             shutdownProtect = false;
                             cnlReader.endControlMode();
-                        } catch (NoSuchAlgorithmException ignored) {
+                        }
+                        catch (NoSuchAlgorithmException ignored) {
+
                         }
                     }
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                     commsError++;
                     Log.e(TAG, "Error connecting to Contour Next Link.", e);
                     UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__connecting_cnl);
                     UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__connecting_cnl, e.getMessage()));
                     if (cnlReader.resetCNL()) UserLogMessage.send(mContext, UserLogMessage.TYPE.INFO, R.string.ul_error__cnl_reset_success);
-                } catch (ChecksumException e) {
+                }
+                catch (ChecksumException e) {
                     commsError++;
                     Log.e(TAG, "Checksum error getting message from the Contour Next Link.", e);
                     UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__checksum_cnl);
                     UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__checksum, e.getMessage()));
-                } catch (EncryptionException e) {
+                }
+                catch (EncryptionException e) {
                     commsError++;
                     Log.e(TAG, "Error decrypting messages from Contour Next Link.", e);
                     UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__decryption_cnl);
                     UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__decryption, e.getMessage()));
-                } catch (TimeoutException e) {
+                }
+                catch (TimeoutException e) {
                     commsError++;
                     Log.e(TAG, "Timeout communicating with the Contour Next Link.", e);
                     UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__timeout_cnl);
                     UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__timeout, e.getMessage()));
                     if (cnlReader.resetCNL()) UserLogMessage.send(mContext, UserLogMessage.TYPE.INFO, R.string.ul_error__cnl_reset_success);
-                } catch (UnexpectedMessageException e) {
+                }
+                catch (UnexpectedMessageException e) {
                     commsError++;
                     Log.e(TAG, "Could not close connection.", e);
                     UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_error__close_connection);
                     UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_error__close_connection, e.getMessage()));
                     if (cnlReader.resetCNL()) UserLogMessage.send(mContext, UserLogMessage.TYPE.INFO, R.string.ul_error__cnl_reset_success);
-                } finally {
+                }
+                finally {
                     shutdownProtect = false;
 
                     nextpoll = requestPollTime(timePollStarted, pollInterval);
@@ -701,19 +741,27 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                     RemoveOutdatedRecords();
                 }
 
-            } catch (UsbException e) {
+            }
+
+            catch (UsbException e) {
                 Log.w(TAG, "Could not open usb device");
                 pumpHistoryHandler.systemEvent(PumpHistorySystem.STATUS.CNL_USB_ERROR)
                         .lastConnect()
                         .process();
 
-            } catch (Exception e) {
+            }
+
+            catch (Exception e) {
+                editor.putBoolean("microLinkError", true);
+                editor.apply();
                 Log.e(TAG, "Unexpected Error! " + Log.getStackTraceString(e));
                 UserLogMessage.sendN(mContext, UserLogMessage.TYPE.WARN, R.string.ul_poll__polling_service_could_not_complete);
                 UserLogMessage.sendE(mContext, UserLogMessage.TYPE.WARN, String.format("{id;%s} %s", R.string.ul_poll__unexpected_error, Log.getStackTraceString(e)));
                 nextpoll = System.currentTimeMillis() + 60000L;
 
-            } finally {
+            }
+
+            finally {
 
                 if (mHidDevice != null) {
                     Log.i(TAG, "Closing serial device...");
@@ -898,42 +946,45 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
     }
 
     private void checkCGM(PumpStatusEvent pumpRecord) {
+
+        SharedPreferences pref = getSharedPreferences("MyPrefs", MODE_PRIVATE);
+        SharedPreferences.Editor editor = pref.edit();
         if (pumpRecord.isCgmActive()) {
             pumpCgmNA = 0; // poll clash detection
             pumpLostSensorError = 0;
             commsCgmSuccess++;
 
-            if (pumpRecord.isCgmWarmUp())
+            if (pumpRecord.isCgmWarmUp()) {
                 UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_is_in_warm_up_phase);
-            else if (pumpRecord.getCalibrationDueMinutes() == 0)
-                UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_calibration_is_due_now);
-            else if (pumpRecord.getSgv() == 0 && pumpRecord.isCgmCalibrating())
-                UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_is_calibrating);
-            else if (pumpRecord.getSgv() == 0)
-                UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM,
-                        String.format("{id;%s} ({id;%s})", R.string.ul_poll__sensor_error,
-                                PumpHistoryParser.CGM_EXCEPTION.convert(pumpRecord.getCgmExceptionType()).stringId()));
+                editor.putBoolean("sensorLinkError", true);
+                editor.apply();
+            }
             else {
-                UserLogMessage.sendN(mContext, UserLogMessage.TYPE.SGV,
-                        String.format("{id;%s} {sgv;%s} {id;%s} {time.sgv;%s} {id;%s} {diff;%s}",
-                                R.string.ul_poll__reading_sgv__SGV,
-                                pumpRecord.getSgv(),
-                                R.string.ul_poll__reading_time__at,
-                                pumpRecord.getCgmDate().getTime(),
-                                R.string.ul_poll__reading_pump_clock_difference__Pump,
-                                pumpClockDifference / 1000L
-                        ));
-                UserLogMessage.sendE(mContext, UserLogMessage.TYPE.SGV,
-                        String.format("{id;%s} {sgv;%s} {id;%s} {time.sgv.e;%s} {id;%s} {diff;%s}",
-                                R.string.ul_poll__reading_sgv__SGV,
-                                pumpRecord.getSgv(),
-                                R.string.ul_poll__reading_time__at,
-                                pumpRecord.getCgmDate().getTime(),
-                                R.string.ul_poll__reading_pump_clock_difference__Pump,
-                                pumpClockDifference / 1000L
-                        ));
-                if (pumpRecord.isCgmCalibrating())
-                    UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_is_calibrating);
+                if (pumpRecord.getCalibrationDueMinutes() == 0) {
+                    UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_calibration_is_due_now);
+                    editor.putBoolean("sensorLinkError", true);
+                    editor.apply();
+                }
+                else {
+                    if (pumpRecord.getSgv() == 0 && pumpRecord.isCgmCalibrating()) {
+                        UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_is_calibrating);
+                        editor.putBoolean("sensorLinkError", true);
+                        editor.apply();
+                    }
+                    else {
+                        if (pumpRecord.getSgv() == 0) {
+                            UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, String.format("{id;%s} ({id;%s})", R.string.ul_poll__sensor_error, PumpHistoryParser.CGM_EXCEPTION.convert(pumpRecord.getCgmExceptionType()).stringId()));
+                            editor.putBoolean("sensorLinkError", true);
+                            editor.apply();
+                        }
+                        else {
+                            UserLogMessage.sendN(mContext, UserLogMessage.TYPE.SGV, String.format("{id;%s} {sgv;%s} {id;%s} {time.sgv;%s} {id;%s} {diff;%s}", R.string.ul_poll__reading_sgv__SGV, pumpRecord.getSgv(), R.string.ul_poll__reading_time__at, pumpRecord.getCgmDate().getTime(), R.string.ul_poll__reading_pump_clock_difference__Pump, pumpClockDifference / 1000L));
+                            UserLogMessage.sendE(mContext, UserLogMessage.TYPE.SGV, String.format("{id;%s} {sgv;%s} {id;%s} {time.sgv.e;%s} {id;%s} {diff;%s}", R.string.ul_poll__reading_sgv__SGV, pumpRecord.getSgv(), R.string.ul_poll__reading_time__at, pumpRecord.getCgmDate().getTime(), R.string.ul_poll__reading_pump_clock_difference__Pump, pumpClockDifference / 1000L));
+                            if (pumpRecord.isCgmCalibrating())
+                                UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__sensor_is_calibrating);
+                        }
+                    }
+                }
             }
 
             if (pumpRecord.isCgmOldWhenNewExpected()) {
@@ -945,7 +996,8 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
                 }
             }
 
-        } else {
+        }
+        else {
             pumpCgmNA++; // poll clash detection
             if (pumpRecord.isCgmLostSensor()) {
                 pumpLostSensorError++; // only count errors if cgm is being used
@@ -953,6 +1005,8 @@ CNL: unpaired PUMP: unpaired UPLOADER: unregistered = "Invalid message received 
             } else {
                 UserLogMessage.send(mContext, UserLogMessage.TYPE.CGM, R.string.ul_poll__no_cgm);
             }
+            editor.putBoolean("sensorLinkError", true);
+            editor.apply();
         }
     }
 

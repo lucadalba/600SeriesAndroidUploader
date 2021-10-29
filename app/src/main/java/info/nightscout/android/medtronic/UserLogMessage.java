@@ -185,7 +185,15 @@ public class UserLogMessage {
                             .putExtra("flag", flag)
                             .putExtra("message", message);
             context.sendBroadcast(intent);
-        } catch (Exception ignored) {
+            Log.d("Intento", "" + message);
+
+            if(type==TYPE.WARN)
+                MainActivity.usbError.setValue(true);
+            else
+                MainActivity.usbError.setValue(false);
+
+        }
+        catch (Exception ignored) {
         }
     }
 
